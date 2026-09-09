@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>coinflow — file index</title>
+<meta name="description" content="Browsable index of every file and folder in the coinflow repository.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --border: #e4e0d8;
+    --text: #1c1a17;
+    --muted: #6f6a62;
+    --accent: #b4552d;
+    --accent-soft: #f4e7e0;
+    --shadow: 0 1px 2px rgba(28, 26, 23, .06), 0 8px 24px -12px rgba(28, 26, 23, .18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171614;
+      --panel: #201e1b;
+      --border: #34302b;
+      --text: #ece8e2;
+      --muted: #9c958a;
+      --accent: #e0805a;
+      --accent-soft: #33251e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .6);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 20px 72px; }
+  header { margin-bottom: 28px; }
+  h1 {
+    margin: 0 0 6px;
+    font-size: 26px;
+    letter-spacing: -.02em;
+  }
+  h1 a { color: inherit; text-decoration: none; }
+  h1 a:hover { color: var(--accent); }
+  .sub { margin: 0; color: var(--muted); font-size: 14px; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin: 22px 0 14px; flex-wrap: wrap; }
+  #search {
+    flex: 1 1 240px;
+    min-width: 0;
+    padding: 9px 12px;
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+  }
+  #search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .count { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  nav.crumbs {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    font-size: 14px; margin-bottom: 12px; min-height: 22px;
+  }
+  nav.crumbs a { color: var(--accent); text-decoration: none; }
+  nav.crumbs a:hover { text-decoration: underline; }
+  nav.crumbs span.sep { color: var(--muted); }
+  nav.crumbs span.here { color: var(--muted); }
+  ul.listing { list-style: none; margin: 0; padding: 0; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+  li.row { display: flex; gap: 14px; padding: 14px 16px; border-top: 1px solid var(--border); align-items: flex-start; }
+  li.row:first-child { border-top: 0; }
+  li.row:hover { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
+  .icon { flex: none; width: 22px; text-align: center; font-size: 15px; line-height: 1.5; color: var(--muted); }
+  .main { flex: 1 1 auto; min-width: 0; }
+  .name { font-weight: 600; font-size: 15px; letter-spacing: -.01em; word-break: break-word; }
+  .name a { color: var(--text); text-decoration: none; }
+  .name a:hover { color: var(--accent); text-decoration: underline; }
+  .desc { color: var(--muted); font-size: 13.5px; margin-top: 3px; word-break: break-word; }
+  .meta { color: var(--muted); font-size: 12.5px; margin-top: 5px; display: flex; gap: 10px; flex-wrap: wrap;
+    font-variant-numeric: tabular-nums; }
+  .links { flex: none; display: flex; gap: 8px; align-items: center; padding-top: 1px; }
+  .links a {
+    font-size: 12.5px; text-decoration: none; color: var(--accent);
+    border: 1px solid var(--border); border-radius: 7px; padding: 4px 9px; white-space: nowrap;
+  }
+  .links a:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+  footer { margin-top: 22px; color: var(--muted); font-size: 12.5px; }
+  footer a { color: var(--accent); }
+  @media (max-width: 600px) {
+    .links { flex-direction: column; align-items: stretch; }
+    li.row { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><a href="#/">coinflow</a></h1>
+    <p class="sub">Every file and folder in this repository, indexed automatically.</p>
+  </header>
+
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Search files by name or description…" autocomplete="off">
+    <span class="count" id="count"></span>
+  </div>
+
+  <nav class="crumbs" id="crumbs"></nav>
+  <ul class="listing" id="listing"><li class="row"><div class="empty">Loading index…</div></li></ul>
+
+  <footer id="footer"></footer>
+</div>
+
+<script>
+const listingEl = document.getElementById("listing");
+const crumbsEl = document.getElementById("crumbs");
+const countEl = document.getElementById("count");
+const footerEl = document.getElementById("footer");
+const searchEl = document.getElementById("search");
+
+let data = null;
+let allFiles = [];
+
+const fmtSize = (n) => {
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB";
+  return (n / 1048576).toFixed(1) + " MB";
+};
+
+const blobUrl = (p) =>
+  `https://github.com/${data.repo.owner}/${data.repo.name}/blob/${data.repo.branch}/${p}`;
+
+function flatten(node, out = []) {
+  out.push(...node.files);
+  node.folders.forEach((f) => flatten(f, out));
+  return out;
+}
+
+function findFolder(segments) {
+  let node = data.tree;
+  for (const seg of segments) {
+    const next = node.folders.find((f) => f.name === seg);
+    if (!next) return null;
+    node = next;
+  }
+  return node;
+}
+
+function currentPath() {
+  const raw = decodeURIComponent(location.hash.replace(/^#\/?/, "")).replace(/\/$/, "");
+  return raw ? raw.split("/") : [];
+}
+
+function renderCrumbs(segments) {
+  const parts = [`<a href="#/">coinflow</a>`];
+  segments.forEach((seg, i) => {
+    const target = "#/" + segments.slice(0, i + 1).map(encodeURIComponent).join("/");
+    parts.push(`<span class="sep">/</span>`);
+    parts.push(i === segments.length - 1
+      ? `<span class="here">${escapeHtml(seg)}</span>`
+      : `<a href="${target}">${escapeHtml(seg)}</a>`);
+  });
+  crumbsEl.innerHTML = parts.join(" ");
+}
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function folderRow(folder) {
+  const fileCount = flatten(folder).length;
+  const target = "#/" + folder.path.split("/").map(encodeURIComponent).join("/");
+  return `<li class="row">
+    <div class="icon">▸</div>
+    <div class="main">
+      <div class="name"><a href="${target}">${escapeHtml(folder.name)}/</a></div>
+      <div class="meta"><span>${fileCount} file${fileCount === 1 ? "" : "s"}</span></div>
+    </div>
+    <div class="links"><a href="${target}">Open folder</a></div>
+  </li>`;
+}
+
+function fileRow(file, showFullPath) {
+  const label = showFullPath ? file.path : file.name;
+  const openHref = file.viewable ? file.path : blobUrl(file.path);
+  return `<li class="row">
+    <div class="icon">•</div>
+    <div class="main">
+      <div class="name"><a href="${escapeHtml(openHref)}">${escapeHtml(label)}</a></div>
+      ${file.description ? `<div class="desc">${escapeHtml(file.description)}</div>` : ""}
+      <div class="meta">
+        <span>${escapeHtml(file.kind)}</span>
+        <span>${fmtSize(file.size)}</span>
+        <span>Updated ${escapeHtml(file.updated)}</span>
+      </div>
+    </div>
+    <div class="links">
+      ${file.viewable ? `<a href="${escapeHtml(file.path)}">Open</a>` : ""}
+      <a href="${escapeHtml(blobUrl(file.path))}">Source</a>
+    </div>
+  </li>`;
+}
+
+function render() {
+  const query = searchEl.value.trim().toLowerCase();
+
+  if (query) {
+    crumbsEl.innerHTML = `<span class="here">Search results</span>`;
+    const hits = allFiles.filter((f) =>
+      f.path.toLowerCase().includes(query) ||
+      (f.description ?? "").toLowerCase().includes(query));
+    countEl.textContent = `${hits.length} of ${allFiles.length} files`;
+    listingEl.innerHTML = hits.length
+      ? hits.map((f) => fileRow(f, true)).join("")
+      : `<li class="row"><div class="empty">No files match “${escapeHtml(searchEl.value.trim())}”.</div></li>`;
+    return;
+  }
+
+  const segments = currentPath();
+  const folder = findFolder(segments);
+  if (!folder) {
+    crumbsEl.innerHTML = `<a href="#/">coinflow</a>`;
+    listingEl.innerHTML = `<li class="row"><div class="empty">That folder doesn’t exist. <a href="#/">Back to root</a>.</div></li>`;
+    countEl.textContent = "";
+    return;
+  }
+
+  renderCrumbs(segments);
+  const rows = [...folder.folders.map(folderRow), ...folder.files.map((f) => fileRow(f, false))];
+  countEl.textContent = `${folder.folders.length} folder${folder.folders.length === 1 ? "" : "s"}, ${folder.files.length} file${folder.files.length === 1 ? "" : "s"} here · ${allFiles.length} total`;
+  listingEl.innerHTML = rows.length
+    ? rows.join("")
+    : `<li class="row"><div class="empty">This folder is empty.</div></li>`;
+}
+
+fetch("file-index.json", { cache: "no-cache" })
+  .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then((json) => {
+    data = json;
+    allFiles = flatten(data.tree);
+    const when = new Date(data.generated);
+    footerEl.innerHTML = `Index regenerated automatically on every push · last built ${when.toLocaleString()} · <a href="https://github.com/${data.repo.owner}/${data.repo.name}">view repository on GitHub</a>`;
+    render();
+  })
+  .catch(() => {
+    listingEl.innerHTML = `<li class="row"><div class="empty">Couldn’t load <code>file-index.json</code>. It is generated by the Update file index workflow — check that the workflow has run.</div></li>`;
+  });
+
+window.addEventListener("hashchange", () => { searchEl.value = ""; render(); });
+searchEl.addEventListener("input", render);
+</script>
+</body>
+</html>
