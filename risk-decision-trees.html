@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Risk decision tree strategy</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap');
+
+:root{
+  --ink:#14293D;
+  --ink-soft:#4A6076;
+  --ink-faint:#7B8FA1;
+  --paper:#E9EDF0;
+  --panel:#FFFFFF;
+  --rule:#C3CDD4;
+  --rule-soft:#DCE3E8;
+
+  --a-std:#0B6E4F;
+  --a-prem:#77820F;
+  --a-cap:#A8770C;
+  --a-step:#1F5D96;
+  --a-open:#5A4E8C;
+  --a-decline:#9C2A2A;
+
+  --sans:"IBM Plex Sans", system-ui, sans-serif;
+  --serif:"IBM Plex Serif", Georgia, serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.62}
+.wrap{max-width:1060px;margin:0 auto;padding:0 28px}
+.prose{max-width:66ch}
+p{margin:0 0 1.05em}
+h1,h2,h3{font-family:var(--sans);line-height:1.2;margin:0}
+h1{font-size:clamp(30px,4.6vw,50px);font-weight:700;letter-spacing:-0.02em}
+h2{font-size:clamp(22px,2.6vw,29px);font-weight:600;letter-spacing:-0.015em}
+h3{font-size:16px;font-weight:600}
+a{color:var(--ink)}
+code,.mono{font-family:var(--mono);font-size:0.88em}
+strong{font-weight:600}
+
+.masthead{padding:52px 0 30px;border-bottom:3px solid var(--ink)}
+.masthead .kicker{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);margin-bottom:20px}
+.masthead h1{max-width:17ch}
+.masthead .standfirst{font-size:19px;color:var(--ink-soft);max-width:62ch;margin-top:20px}
+
+section{padding:46px 0;border-bottom:1px solid var(--rule)}
+section:last-of-type{border-bottom:none}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:22px}
+.sec-head .n{font-family:var(--mono);font-size:13px;color:var(--ink-faint);flex:none;padding-top:4px}
+
+.treebox{background:var(--panel);border:1px solid var(--rule);margin:28px 0 0;padding:18px 18px 8px}
+.treebox svg{width:100%;height:auto;display:block}
+.tcap{font-family:var(--sans);font-size:13px;font-weight:600;margin:0 0 4px}
+.tsub{font-size:13.5px;color:var(--ink-faint);max-width:78ch;margin:0 0 14px}
+svg .nlab{font-family:var(--sans);font-size:12.5px;font-weight:600;fill:var(--ink)}
+svg .nstat{font-family:var(--mono);font-size:11px;fill:var(--ink-faint)}
+svg .nact{font-family:var(--sans);font-size:11px;font-weight:600}
+svg .colhead{font-family:var(--mono);font-size:11px;fill:var(--ink-faint)}
+svg .anno{font-family:var(--serif);font-style:italic;font-size:11.5px;fill:var(--ink-faint)}
+svg .qlab{font-family:var(--mono);font-size:10.5px;fill:var(--ink-soft)}
+svg .slab{font-family:var(--sans);font-size:12.5px;font-weight:600;fill:var(--ink)}
+svg .ssub{font-family:var(--serif);font-size:11.5px;fill:var(--ink-faint)}
+svg .sax{font-family:var(--mono);font-size:10.5px;fill:var(--ink-faint)}
+svg .sband{font-family:var(--sans);font-size:10px;font-weight:600;fill:#ffffff}
+
+.key{display:flex;flex-wrap:wrap;gap:6px 20px;padding:14px 0 0;border-top:1px solid var(--rule-soft);margin-top:12px}
+.key span{font-family:var(--sans);font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:7px}
+.key i{width:11px;height:11px;border-radius:2px;display:block}
+
+.console{background:var(--panel);border:1px solid var(--rule);margin:28px 0 0}
+.console-bar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--rule);background:var(--ink);color:#fff}
+.console-bar .t{font-family:var(--sans);font-size:14px;font-weight:600}
+.console-bar .s{font-family:var(--mono);font-size:11.5px;color:#A7BACB}
+.controls{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--rule)}
+.ctl{padding:16px 18px;border-right:1px solid var(--rule-soft)}
+.ctl:last-child{border-right:none}
+.ctl .lab{font-family:var(--sans);font-size:13px;font-weight:600;margin-bottom:2px}
+.ctl .hint{font-size:12.5px;color:var(--ink-faint);line-height:1.35;margin-bottom:10px;min-height:2.7em}
+.opt{display:block;width:100%;text-align:left;font-family:var(--mono);font-size:12.5px;padding:6px 9px;margin-bottom:4px;border:1px solid var(--rule-soft);background:#fff;color:var(--ink-soft);cursor:pointer;border-radius:2px}
+.opt:hover{border-color:var(--ink-faint)}
+.opt[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:500}
+.opt:focus-visible{outline:2px solid var(--a-step);outline-offset:1px}
+.trace{display:grid;grid-template-columns:1.35fr 1fr}
+.trace-nodes{padding:6px 0 14px;border-right:1px solid var(--rule)}
+.node{padding:12px 20px;border-bottom:1px solid var(--rule-soft)}
+.node:last-child{border-bottom:none}
+.node .q{font-family:var(--sans);font-size:12.5px;font-weight:600;margin-bottom:7px;display:flex;gap:9px}
+.node .q .ix{font-family:var(--mono);font-weight:400;color:var(--ink-faint)}
+.branches{display:flex;flex-wrap:wrap;gap:5px;padding-left:23px}
+.br{font-family:var(--mono);font-size:11.5px;padding:3px 8px;border:1px solid var(--rule-soft);color:var(--ink-faint);border-radius:2px;background:#FBFCFD}
+.br.on{border-color:var(--ink);background:var(--ink);color:#fff}
+.node .why{font-size:12.5px;color:var(--ink-faint);padding-left:23px;margin-top:7px;font-style:italic}
+.leafpane{padding:18px 20px}
+.leaf-action{font-family:var(--sans);font-size:19px;font-weight:700;line-height:1.22;margin-bottom:6px}
+.leaf-sub{font-size:13.5px;color:var(--ink-soft);margin-bottom:16px}
+.econ{border-top:1px solid var(--rule)}
+.econ-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--rule-soft);font-family:var(--mono);font-size:12.5px}
+.econ-row .k{color:var(--ink-faint)}
+.econ-row.total{border-bottom:none;font-weight:600;font-size:13.5px}
+.econ-row.total .k{color:var(--ink)}
+.pill{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px}
+
+.matrix-wrap{background:var(--panel);border:1px solid var(--rule);border-top:none;padding:20px}
+.matrix-cap{font-family:var(--sans);font-size:13px;font-weight:600;margin-bottom:3px}
+.matrix-sub{font-size:13px;color:var(--ink-faint);margin-bottom:14px;max-width:74ch}
+table.matrix{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
+table.matrix th{font-weight:500;color:var(--ink-faint);text-align:left;padding:6px 8px;border-bottom:1px solid var(--rule)}
+table.matrix td{padding:0;border:1px solid #fff}
+.cell{padding:10px 9px;color:#fff;min-height:52px}
+.cell .act{font-family:var(--sans);font-size:11.5px;font-weight:600;display:block;line-height:1.25}
+.cell .el{font-size:11px;opacity:.82;display:block;margin-top:3px}
+.cell.here{outline:3px solid var(--ink);outline-offset:-3px}
+th.rowh{font-weight:500;color:var(--ink-soft);white-space:nowrap;padding-right:12px;border-bottom:1px solid var(--rule-soft)}
+
+.tests{border-top:2px solid var(--ink);margin:10px 0 0}
+.test{display:grid;grid-template-columns:26px 1fr;gap:14px;padding:16px 0;border-bottom:1px solid var(--rule)}
+.test .num{font-family:var(--mono);font-size:12px;color:var(--ink-faint);padding-top:3px}
+.test .nm{font-family:var(--sans);font-size:16px;font-weight:600;margin-bottom:5px}
+.test p{margin:0;font-size:15.5px;color:var(--ink-soft);max-width:74ch}
+.test .fail{font-family:var(--mono);font-size:12px;color:var(--a-decline);margin-top:7px}
+
+.levers{border-top:2px solid var(--ink);margin-top:10px}
+.lever{padding:18px 0;border-bottom:1px solid var(--rule)}
+.lever .top{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:7px}
+.lever .nm{font-family:var(--sans);font-size:16px;font-weight:600}
+.lever .prox{font-style:italic;color:var(--ink-soft);font-size:14.5px}
+.lever p{margin:0 0 8px;font-size:15.5px;max-width:74ch}
+.cuts{font-family:var(--mono);font-size:12px;color:var(--ink-soft);background:#DFE5EA;padding:7px 10px;display:inline-block;border-radius:2px}
+
+.calc{background:var(--panel);border:1px solid var(--rule);padding:22px;margin-top:26px}
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
+.field{margin-bottom:16px}
+.field label{display:block;font-family:var(--sans);font-size:13px;font-weight:600;margin-bottom:5px}
+.field .val{font-family:var(--mono);font-size:13px;color:var(--ink-soft);margin-bottom:6px}
+input[type=range]{width:100%;accent-color:var(--a-step)}
+.verdict{padding:14px 16px;border-left:4px solid;background:#F4F7F9}
+.verdict .hd{font-family:var(--sans);font-size:15px;font-weight:600;margin-bottom:5px}
+.verdict .bd{font-size:14.5px;color:var(--ink-soft);line-height:1.5}
+.readout{font-family:var(--mono);font-size:12.5px;border-top:1px solid var(--rule);margin-top:14px}
+.readout div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--rule-soft)}
+.readout .k{color:var(--ink-faint)}
+
+.aside{border-left:3px solid var(--ink);padding:14px 0 14px 18px;margin:24px 0}
+.aside .hd{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-bottom:6px}
+.aside p{font-size:15px;margin:0;max-width:70ch}
+ol.rot{counter-reset:r;list-style:none;padding:0;margin:0;max-width:76ch}
+ol.rot li{counter-increment:r;position:relative;padding:0 0 16px 40px;margin-bottom:16px;border-bottom:1px solid var(--rule-soft)}
+ol.rot li:last-child{border-bottom:none}
+ol.rot li::before{content:counter(r,decimal-leading-zero);position:absolute;left:0;top:2px;font-family:var(--mono);font-size:12px;color:var(--a-decline)}
+ol.rot .t{font-family:var(--sans);font-weight:600;font-size:15px;display:block;margin-bottom:3px}
+ol.rot .d{font-size:15px;color:var(--ink-soft)}
+.gov{max-width:76ch}
+.gov dt{font-family:var(--sans);font-size:15px;font-weight:600;margin-top:16px}
+.gov dd{margin:4px 0 0;font-size:15px;color:var(--ink-soft)}
+footer{padding:40px 0 70px;font-size:15px;color:var(--ink-soft);max-width:68ch}
+
+@media (max-width:860px){
+  .controls{grid-template-columns:1fr 1fr}
+  .ctl{border-bottom:1px solid var(--rule-soft)}
+  .trace{grid-template-columns:1fr}
+  .trace-nodes{border-right:none;border-bottom:1px solid var(--rule)}
+  .calc-grid{grid-template-columns:1fr}
+  body{font-size:16px}
+  .wrap{padding:0 18px}
+  .treebox{overflow-x:auto}
+  .treebox svg{min-width:900px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .cell,.opt,.br,.leaf-action{transition:background-color .18s ease,color .18s ease,border-color .18s ease}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="kicker">Working note &middot; risk decision tree strategy</div>
+  <h1>A decision tree is a policy for where to stop asking questions</h1>
+  <p class="standfirst">Every branch buys a more specific answer and costs evidence, maintenance, and the ability to explain yourself later. This walks through how the structure works, how to judge whether a split earns its place, and how to pick levers that describe risk rather than merely correlate with it.</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="n">01</span><h2>What the structure is actually doing</h2></div>
+  <div class="prose">
+    <p>A tree takes one population, cuts it into cells, and gives each cell one action. That is the entire mechanism. Everything else is a question of where to cut and when to stop.</p>
+    <p>The reason to build one, rather than scoring everything with a model and applying a threshold, is that some distinctions are not matters of degree. A model turns many correlated signals into a single number that moves smoothly, which is exactly what you want for ranking risk. What it cannot express is "we are not permitted to cover this segment," or "liability sits with someone else here," or "this cell is priced differently by contract." Those are discontinuities, and a tree is the right instrument for them. Use the model for gradient and the tree for policy, and the tree stays small enough that a person can read it.</p>
+    <p>Below is a tree with its analytics attached. Each node carries the share of volume sitting underneath it and its expected loss rate; each leaf carries the action that cell earns and the score cutoff at which it earns it. Read it left to right, and pay particular attention to the branch that did <em>not</em> get split.</p>
+  </div>
+
+  <div class="treebox">
+    <div class="tcap">One population, cut three different ways, ending in a cutoff on the model score</div>
+    <div class="tsub">Volumes, loss rates and cutoffs are illustrative. Two things to notice: branches have unequal depth, because you split where the action changes rather than to keep the diagram symmetrical; and no leaf is a final answer. Each one ends by handing the transaction to the score with its own thresholds. The strip on the right is the score axis, riskiest on the left, and the number marks where the leaf's headline action begins.</div>
+    <svg viewBox="0 0 1220 600" role="img" aria-label="Decision tree with volume, loss analytics and model score cutoffs at each leaf">
+      <text class="colhead" x="30" y="20">population</text>
+      <text class="colhead" x="280" y="20">split 1: observed repayment history</text>
+      <text class="colhead" x="560" y="20">split 2: varies by branch</text>
+      <text class="colhead" x="870" y="20">leaf cutoff on model score</text>
+
+      <g fill="none" stroke="#C3CDD4" stroke-width="1.4">
+        <path d="M210,298 H245 V120 H280"/>
+        <path d="M210,298 H245 V310 H280"/>
+        <path d="M210,298 H245 V490 H280"/>
+        <path d="M470,120 H515 V75 H560"/>
+        <path d="M470,120 H515 V137 H560"/>
+        <path d="M470,120 H515 V199 H560"/>
+        <path d="M470,310 H515 V287 H560"/>
+        <path d="M470,310 H515 V349 H560"/>
+      </g>
+      <g fill="none" stroke="#C3CDD4" stroke-width="1.4" stroke-dasharray="3 4">
+        <path d="M470,490 H515 V467 H560"/>
+        <path d="M470,490 H515 V529 H560"/>
+      </g>
+      <g fill="none" stroke="#DCE3E8" stroke-width="1.2">
+        <path d="M850,75 H870"/><path d="M850,137 H870"/><path d="M850,199 H870"/>
+        <path d="M850,287 H870"/><path d="M850,349 H870"/>
+        <path d="M850,467 H870"/><path d="M850,529 H870"/>
+      </g>
+
+      <rect x="30" y="263" width="180" height="70" fill="#14293D"/>
+      <text class="nlab" x="44" y="288" fill="#ffffff">All eligible volume</text>
+      <text class="nstat" x="44" y="307" fill="#A7BACB">100% of volume</text>
+      <text class="nstat" x="44" y="323" fill="#A7BACB">62 bps blended loss</text>
+
+      <rect x="280" y="88" width="190" height="64" fill="#F4F7F9" stroke="#C3CDD4"/>
+      <text class="nlab" x="292" y="110">No settled history</text>
+      <text class="nstat" x="292" y="128">18% vol &#183; 186 bps</text>
+      <rect x="292" y="136" width="100" height="4" fill="#E3E9ED"/>
+      <rect x="292" y="136" width="18" height="4" fill="#7B8FA1"/>
+
+      <rect x="280" y="278" width="190" height="64" fill="#F4F7F9" stroke="#C3CDD4"/>
+      <text class="nlab" x="292" y="300">1 to 3 settled</text>
+      <text class="nstat" x="292" y="318">24% vol &#183; 71 bps</text>
+      <rect x="292" y="326" width="100" height="4" fill="#E3E9ED"/>
+      <rect x="292" y="326" width="24" height="4" fill="#7B8FA1"/>
+
+      <rect x="280" y="458" width="190" height="64" fill="#F4F7F9" stroke="#C3CDD4"/>
+      <text class="nlab" x="292" y="480">4 or more settled</text>
+      <text class="nstat" x="292" y="498">58% vol &#183; 24 bps</text>
+      <rect x="292" y="506" width="100" height="4" fill="#E3E9ED"/>
+      <rect x="292" y="506" width="58" height="4" fill="#7B8FA1"/>
+
+      <text class="qlab" x="497" y="70">by amount</text>
+      <text class="qlab" x="497" y="258">by verification state</text>
+
+      <rect x="560" y="48" width="290" height="54" fill="#ffffff" stroke="#C3CDD4"/>
+      <rect x="560" y="48" width="5" height="54" fill="#77820F"/>
+      <text class="nlab" x="578" y="68">Under $500</text>
+      <text class="nstat" x="578" y="86">7% vol &#183; 96 bps</text>
+      <text class="nact" x="836" y="80" fill="#77820F" text-anchor="end">cover, premium price</text>
+      <rect x="870" y="60" width="116" height="30" fill="#9C2A2A"/>
+      <rect x="986" y="60" width="64" height="30" fill="#1F5D96"/>
+      <rect x="1050" y="60" width="110" height="30" fill="#77820F"/>
+      <text class="sband" x="1058" y="79">62 and up</text>
+
+      <rect x="560" y="110" width="290" height="54" fill="#ffffff" stroke="#C3CDD4"/>
+      <rect x="560" y="110" width="5" height="54" fill="#A8770C"/>
+      <text class="nlab" x="578" y="130">$500 to $2,500</text>
+      <text class="nstat" x="578" y="148">8% vol &#183; 178 bps</text>
+      <text class="nact" x="836" y="142" fill="#A8770C" text-anchor="end">cover, capped exposure</text>
+      <rect x="870" y="122" width="160" height="30" fill="#9C2A2A"/>
+      <rect x="1030" y="122" width="66" height="30" fill="#1F5D96"/>
+      <rect x="1096" y="122" width="64" height="30" fill="#A8770C"/>
+      <text class="sband" x="1104" y="141">78 up</text>
+
+      <rect x="560" y="172" width="290" height="54" fill="#ffffff" stroke="#C3CDD4"/>
+      <rect x="560" y="172" width="5" height="54" fill="#1F5D96"/>
+      <text class="nlab" x="578" y="192">Above $2,500</text>
+      <text class="nstat" x="578" y="210">3% vol &#183; 402 bps</text>
+      <text class="nact" x="836" y="204" fill="#1F5D96" text-anchor="end">verify, then re-decide</text>
+      <rect x="870" y="184" width="203" height="30" fill="#9C2A2A"/>
+      <rect x="1073" y="184" width="52" height="30" fill="#1F5D96"/>
+      <rect x="1125" y="184" width="35" height="30" fill="#A8770C"/>
+      <text class="sband" x="1081" y="203">70 up</text>
+
+      <rect x="560" y="260" width="290" height="54" fill="#ffffff" stroke="#C3CDD4"/>
+      <rect x="560" y="260" width="5" height="54" fill="#0B6E4F"/>
+      <text class="nlab" x="578" y="280">Verified link</text>
+      <text class="nstat" x="578" y="298">15% vol &#183; 44 bps</text>
+      <text class="nact" x="836" y="292" fill="#0B6E4F" text-anchor="end">cover, standard price</text>
+      <rect x="870" y="272" width="64" height="30" fill="#9C2A2A"/>
+      <rect x="934" y="272" width="46" height="30" fill="#1F5D96"/>
+      <rect x="980" y="272" width="180" height="30" fill="#0B6E4F"/>
+      <text class="sband" x="988" y="291">38 and up</text>
+
+      <rect x="560" y="322" width="290" height="54" fill="#ffffff" stroke="#C3CDD4"/>
+      <rect x="560" y="322" width="5" height="54" fill="#A8770C"/>
+      <text class="nlab" x="578" y="342">Manually entered</text>
+      <text class="nstat" x="578" y="360">9% vol &#183; 121 bps</text>
+      <text class="nact" x="836" y="354" fill="#A8770C" text-anchor="end">cover, capped exposure</text>
+      <rect x="870" y="334" width="131" height="30" fill="#9C2A2A"/>
+      <rect x="1001" y="334" width="58" height="30" fill="#1F5D96"/>
+      <rect x="1059" y="334" width="101" height="30" fill="#A8770C"/>
+      <text class="sband" x="1067" y="353">65 and up</text>
+
+      <g opacity="0.5">
+        <rect x="560" y="440" width="290" height="54" fill="#ffffff" stroke="#C3CDD4" stroke-dasharray="3 4"/>
+        <text class="nlab" x="578" y="460">Under $2,500</text>
+        <text class="nstat" x="578" y="478">44% vol &#183; 18 bps</text>
+        <text class="nact" x="836" y="472" fill="#0B6E4F" text-anchor="end">cover, standard price</text>
+        <rect x="870" y="452" width="52" height="30" fill="#9C2A2A"/>
+        <rect x="922" y="452" width="35" height="30" fill="#1F5D96"/>
+        <rect x="957" y="452" width="203" height="30" fill="#0B6E4F"/>
+        <text class="sband" x="965" y="471">30 and up</text>
+
+        <rect x="560" y="502" width="290" height="54" fill="#ffffff" stroke="#C3CDD4" stroke-dasharray="3 4"/>
+        <text class="nlab" x="578" y="522">Above $2,500</text>
+        <text class="nstat" x="578" y="540">14% vol &#183; 41 bps</text>
+        <text class="nact" x="836" y="534" fill="#0B6E4F" text-anchor="end">cover, standard price</text>
+        <rect x="870" y="514" width="52" height="30" fill="#9C2A2A"/>
+        <rect x="922" y="514" width="35" height="30" fill="#1F5D96"/>
+        <rect x="957" y="514" width="203" height="30" fill="#0B6E4F"/>
+        <text class="sband" x="965" y="533">30 and up</text>
+      </g>
+      <text class="anno" x="560" y="578">Rejected: same action and the same cutoff on both sides, so the split is a report, not a branch.</text>
+    </svg>
+    <div class="key">
+      <span><i style="background:var(--a-std)"></i>cover, standard price</span>
+      <span><i style="background:var(--a-prem)"></i>cover, premium price</span>
+      <span><i style="background:var(--a-cap)"></i>cover, capped exposure</span>
+      <span><i style="background:var(--a-step)"></i>verify, then re-decide</span>
+      <span><i style="background:var(--a-open)"></i>proceed uncovered</span>
+      <span><i style="background:var(--a-decline)"></i>decline or counter-offer</span>
+    </div>
+  </div>
+
+  <div class="aside">
+    <div class="hd">the shape to notice</div>
+    <p>The bottom branch holds 58 percent of volume and has no children. That is not laziness, it is the tree working. Splitting it would produce two cells with visibly different loss rates, identical treatment, and identical cutoffs, which adds a policy to maintain and changes nothing about what anyone does. A tree that mirrors the reporting hierarchy is a tree that has confused analysis with decision-making.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="n">02</span><h2>The four numbers every node carries</h2></div>
+  <div class="prose">
+    <p>Before you can evaluate a split, each node has to be instrumented. Four numbers, available for the parent and for every proposed child, or you are guessing.</p>
+    <p><strong>Volume share</strong> tells you whether the node is worth anyone's attention. <strong>Expected loss</strong> is the estimate you will act on. <strong>Confidence in that estimate</strong> is the one people skip, and skipping it is exactly how trees get too deep. <strong>Realized outcome against expectation</strong> is what tells you next quarter whether any of it was true.</p>
+    <p>Evaluating a candidate split is then a comparison rather than a metric. Line the parent up against the proposed children and ask what changes. If the children have different loss rates and identical actions, nothing changes and the split is a report. If they have different actions but one holds two percent of volume, something changes for almost nobody. If they have different actions and real volume but neither will ever accumulate enough evidence to confirm the difference, you have made a decision you cannot audit.</p>
+    <p>Worth stating plainly: the standard splitting criteria from the modeling world, information gain and Gini impurity, are the wrong test here. They measure how cleanly a split separates outcomes. They know nothing about your action set, so they will happily recommend a split that separates risk beautifully and changes no behavior at all. Rank candidates by action-weighted margin lift instead.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="n">03</span><h2>When a split is worth making</h2></div>
+  <div class="prose">
+    <p>Four tests, ordered so the cheapest ones fail first. A split has to pass all four.</p>
+  </div>
+
+  <div class="tests">
+    <div class="test"><span class="num">01</span><div>
+      <div class="nm">Does the action change?</div>
+      <p>At least one child must earn a different treatment than the parent. This is a binary gate and it kills most candidates immediately. Run it before pulling any data, because it can usually be answered from the action set alone.</p>
+      <div class="fail">fails when: the split is interesting rather than actionable</div>
+    </div></div>
+
+    <div class="test"><span class="num">02</span><div>
+      <div class="nm">Is there a mechanism you can name?</div>
+      <p>You should be able to say why this variable separates risk, in terms of what is actually happening, before looking at the lift. Not "the data shows it" but "here is the situation these two groups are in, and here is why they genuinely differ." A split with a mechanism survives distribution shift. A split without one is a correlation carrying an expiry date you cannot see, and it will fail in production without warning.</p>
+      <div class="fail">fails when: the only justification is that it backtested well</div>
+    </div></div>
+
+    <div class="test"><span class="num">03</span><div>
+      <div class="nm">Is the reassigned volume material?</div>
+      <p>The value of a split is roughly the volume that changes treatment, times the margin difference between the old action and the new one, minus what it costs to build, monitor and defend the branch forever. That last term is real and gets left out. A branch is a permanent line item on someone's review calendar. If the answer is a few basis points on two percent of volume, the honest move is to skip it.</p>
+      <div class="fail">fails when: the lift is real but too small to fund its own maintenance</div>
+    </div></div>
+
+    <div class="test"><span class="num">04</span><div>
+      <div class="nm">Can each child be measured?</div>
+      <p>Every cell needs enough loss events to confirm its own rate, or you have created a segment you can never validate. The rule of thumb is roughly a hundred loss events to pin a rate within twenty percent, adjusted upward for how much ticket sizes vary inside the cell. Below that you are reading noise and calling it a segment. This is the test that sets the depth of the tree, so be mechanical about it.</p>
+      <div class="fail">fails when: the child looks clean because it is tiny</div>
+    </div></div>
+  </div>
+
+  <div class="calc">
+    <div class="calc-grid">
+      <div>
+        <div class="field">
+          <label for="vol">Transactions per month in the cell</label>
+          <div class="val" id="volv">25,000</div>
+          <input type="range" id="vol" min="200" max="500000" step="200" value="25000">
+        </div>
+        <div class="field">
+          <label for="rate">Loss incidence, basis points</label>
+          <div class="val" id="ratev">50 bps</div>
+          <input type="range" id="rate" min="2" max="400" step="1" value="50">
+        </div>
+        <div class="field">
+          <label for="disp">Ticket size variation inside the cell</label>
+          <div class="val" id="dispv">moderate</div>
+          <input type="range" id="disp" min="1" max="3" step="1" value="2">
+        </div>
+      </div>
+      <div>
+        <div class="verdict" id="verdict"><div class="hd"></div><div class="bd"></div></div>
+        <div class="readout" id="readout"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prose" style="margin-top:26px">
+    <p>One asymmetry to hold onto. Splitting is cheap to do and expensive to undo, because the moment a branch exists someone builds a report on it, a counterparty is told about it, and an operational process starts assuming it. Set the bar high going in rather than promising to clean up later. The cleanup never happens on schedule.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="n">04</span><h2>Levers are hypotheses about risk, not columns in a table</h2></div>
+  <div class="prose">
+    <p>The temptation with segmentation is to treat it as feature selection: rank the available fields by predictive power, split on the top few. That produces trees that work until they don't, and when they stop working nobody can say why, because nobody ever articulated why they worked.</p>
+    <p>The better discipline is to treat each lever as a claim about a mechanism. Something is happening in the world that makes these two groups genuinely different, and the variable is a visible trace of it. Once you can state the mechanism, three useful things follow: you know where the natural cut points are, you know what would make the lever stop working, and you know whether an adversary can move it. The levers below are stated that way. Yours will differ; the framing transfers.</p>
+  </div>
+
+  <div class="levers">
+    <div class="lever">
+      <div class="top"><span class="nm">Tenure</span><span class="prox">a claim about identity confidence and demonstrated repayment</span></div>
+      <p>The mechanism is that you have watched this party settle obligations before. That is why tenure is not one variable but several, and conflating them is the usual mistake: tenure with the counterparty, tenure of the account, and tenure across your whole network decay at different rates and survive different events.</p>
+      <p>Risk does not fall linearly with days. It falls in steps, at settlement events. The cliffs are the first transaction, the first few settlements clearing the return window, then a stable observed pattern. Cut on settled counts and cleared windows rather than calendar days, or you will keep covering accounts that are ninety days old and have never actually repaid anything.</p>
+      <div class="cuts">settled_count &middot; days_since_window_cleared &middot; network_first_seen</div>
+    </div>
+
+    <div class="lever">
+      <div class="top"><span class="nm">Velocity</span><span class="prox">a claim about tempo, and about relationships being manufactured rather than lived</span></div>
+      <p>Real customers have boring tempo. The mechanism behind velocity is that building a fraudulent position takes work, and work under time pressure produces a rhythm that ordinary behavior does not. That is why velocity is meaningless in absolute terms and sharp in relative ones: five transactions in an hour is unremarkable for one entity and a screaming anomaly for another. Always measure against the entity's own baseline.</p>
+      <p>Velocity is also multi-keyed, and the keys matter more than the counts. Per consumer catches one thing; per device or per account catches another; per counterparty catches an attack in progress that no consumer-level view will ever see. The cross-entity keys are usually where the value sits.</p>
+      <p>Two cautions. Velocity is the most gameable lever you have, because it is the one an attacker directly controls, so it degrades under pressure in a way tenure does not. And it detects unusual speed rather than bad intent, which is why it belongs on friction and verification branches far more often than on decline branches. A step-up costs a good customer a minute; a decline costs you the customer.</p>
+      <div class="cuts">count_1h / trailing_baseline &middot; distinct_accounts_per_device &middot; burst_ratio</div>
+    </div>
+
+    <div class="lever">
+      <div class="top"><span class="nm">Amount</span><span class="prox">a claim about severity, not about frequency</span></div>
+      <p>This distinction matters more than any other on the page. Large transactions are not much more likely to go bad; they are far more expensive when they do. Treating amount as a frequency signal produces bands at round numbers with no relationship to the exposure curve. Treating it as severity leads somewhere more useful: the right response to size is often a cap on covered exposure rather than a refusal.</p>
+      <p>Amount relative to the party's own history is sharper than absolute amount, and it is the version an adversary has to defeat rather than simply avoid. A first transaction at eight thousand and a twentieth transaction at eight thousand share a band and share nothing else.</p>
+      <div class="cuts">amount_band &middot; amount / trailing_p95 &middot; exposure_cap</div>
+    </div>
+
+    <div class="lever">
+      <div class="top"><span class="nm">Vertical or industry</span><span class="prox">a claim about who caused the loss and who could have prevented it</span></div>
+      <p>Verticals differ less in raw loss rate than people assume. What they really differ in is the mix of underlying reasons, whether the counterparty had any ability to stop the loss upstream, and whether liability for the non-fraud portion can sit somewhere other than with you. When dispute data arrives without native reason codes, vertical ends up quietly standing in for reason mix, which is a great deal of weight for one categorical field to carry.</p>
+      <p>It is also the lever most likely to be a container for something else. If one large counterparty drives most of a vertical's volume, you have not built a vertical rule, you have built a single-counterparty rule wearing a costume, and it breaks the moment the mix shifts.</p>
+      <div class="cuts">liability_agreement &middot; reason_code_mix &middot; upstream_control_available</div>
+    </div>
+
+    <div class="lever">
+      <div class="top"><span class="nm">Payment method and rail</span><span class="prox">a claim about how much you know and how long you are exposed</span></div>
+      <p>Method determines two things nothing else does: confidence that the instrument belongs to the person presenting it, and the length of the window in which the decision can be reversed. An instantly verified link, a re-used token from a settled relationship, and a manually keyed account number are three different quantities of knowledge, and the tree should treat them that way.</p>
+      <p>Method is also the lever with a built-in escape hatch. Where the others are handed to you, method is partly something you can purchase: verification converts a weak state into a strong one at a known cost in friction. That makes it the natural pivot for any branch where the honest answer is that you do not yet know enough.</p>
+      <div class="cuts">verification_state &middot; reversal_window_days &middot; step_up_available</div>
+    </div>
+
+    <div class="lever">
+      <div class="top"><span class="nm">Also worth carrying</span><span class="prox">levers that usually belong in the model but occasionally earn a branch</span></div>
+      <p>Institution or issuer, where operational behavior differs enough to change your recourse. Device and session, which are strong signals with short half-lives. The counterparty itself, when concentration is high enough that treating them as a population is a fiction. Time and seasonality, where the mechanism is usually staffing and review capacity rather than customer behavior. Network position, meaning what else you have seen connected to this account, which is the one that compounds as your data grows.</p>
+      <p>Each should clear the same four tests. Most will fail the first one and belong in the score instead, which is the correct outcome rather than a disappointment.</p>
+      <div class="cuts">institution &middot; device_session &middot; counterparty &middot; seasonality &middot; network_degree</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="n">05</span><h2>Ordering: gates, then divergence, then bands</h2></div>
+  <div class="prose">
+    <p>Three tiers, in this order.</p>
+    <p><strong>Gates first.</strong> Anything determining whether an action is legally, contractually or technically available belongs at the top. Whether an agreement exists, whether the rail supports the window you need, whether the segment is in scope at all. These are not risk questions, and mixing them in with risk questions further down is how trees become unreadable. A gate has exactly one job: shrink the set of available actions.</p>
+    <p><strong>Then the splits that most change the action.</strong> Rank by how differently the two sides get treated, weighted by volume. Observed history usually wins, because the gap between an unknown party and a proven one changes the answer at nearly every level of every other variable.</p>
+    <p><strong>Then economic bands.</strong> Amounts and prices sit at the bottom because they are continuous and they are what you retune most often. Keeping them low means retuning touches leaves rather than structure, and structural changes are the expensive ones.</p>
+    <p>One more principle that saves real money: ask cheap questions before expensive ones. Verification carries a cost in conversion and in operational load. Never spend it to learn something history already told you. If a branch reaches the same action either way, the question was free to skip.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="n">06</span><h2>The leaf sets a cutoff, not just an action</h2></div>
+  <div class="prose">
+    <p>The cutoffs in the first diagram were stated without justification. This is where they come from. A leaf does not decide anything on its own; what it does is hand the transaction to the score with instructions about where the line goes, and the interesting question is why those instructions differ from cell to cell.</p>
+    <p>This is the part that gets skipped, and skipping it is why so many risk programs end up with a sophisticated tree, a good model, and a single global cutoff quietly doing all the work. A score of 60 does not mean the same thing everywhere. The model's separation is stronger in some segments than others, the loss given default is different, and the cost of being wrong is different. Applying one threshold across all of them is a decision, just an unexamined one.</p>
+    <p>A cell earns its own cutoff when you can tell the <strong>story</strong> of how loss actually happens there. Not the loss rate: the narrative. First-party misuse looks nothing like account takeover, which looks nothing like a synthetic identity, which looks nothing like a counterparty-side dispute, which looks nothing like ordinary inability to pay. Those five stories have different score distributions, different recoverability, different remedies, and in some cases a completely different set of actions available. That is what justifies moving the line.</p>
+  </div>
+
+  <div class="treebox">
+    <div class="tcap">One score, three stories, three different answers</div>
+    <div class="tsub">Each strip is the same score axis. What changes is where the thresholds sit and which actions are on the menu at all. The dashed line marks a single score arriving in three different cells.</div>
+    <svg viewBox="0 0 1000 290" role="img" aria-label="Score axis showing different cutoffs for three risk stories">
+      <text class="slab" x="30" y="60">Unknown party, thin file</text>
+      <text class="ssub" x="30" y="76">synthetic and first-party risk</text>
+      <rect x="240" y="50" width="363" height="34" fill="#9C2A2A"/>
+      <rect x="603" y="50" width="132" height="34" fill="#1F5D96"/>
+      <rect x="735" y="50" width="99" height="34" fill="#A8770C"/>
+      <rect x="834" y="50" width="66" height="34" fill="#77820F"/>
+      <text class="sband" x="252" y="71">decline</text>
+      <text class="sband" x="615" y="71">verify</text>
+      <text class="sband" x="747" y="71">capped</text>
+      <text class="sband" x="846" y="71">prem</text>
+
+      <text class="slab" x="30" y="124">Established payer, large ticket</text>
+      <text class="ssub" x="30" y="140">severity risk, not identity risk</text>
+      <rect x="240" y="114" width="132" height="34" fill="#9C2A2A"/>
+      <rect x="372" y="114" width="99" height="34" fill="#1F5D96"/>
+      <rect x="471" y="114" width="132" height="34" fill="#A8770C"/>
+      <rect x="603" y="114" width="297" height="34" fill="#0B6E4F"/>
+      <text class="sband" x="252" y="135">decline</text>
+      <text class="sband" x="384" y="135">verify</text>
+      <text class="sband" x="483" y="135">capped</text>
+      <text class="sband" x="615" y="135">cover, standard price</text>
+
+      <text class="slab" x="30" y="188">Counterparty-side dispute</text>
+      <text class="ssub" x="30" y="204">liability sits upstream</text>
+      <rect x="240" y="178" width="297" height="34" fill="#5A4E8C"/>
+      <rect x="537" y="178" width="165" height="34" fill="#A8770C"/>
+      <rect x="702" y="178" width="198" height="34" fill="#0B6E4F"/>
+      <text class="sband" x="252" y="199">proceed uncovered</text>
+      <text class="sband" x="549" y="199">capped</text>
+      <text class="sband" x="714" y="199">cover, standard price</text>
+
+      <g fill="none" stroke="#14293D" stroke-width="1.4" stroke-dasharray="4 3">
+        <path d="M636,40 V222"/>
+      </g>
+      <text class="sax" x="636" y="32" text-anchor="middle">score 60</text>
+
+      <g stroke="#C3CDD4" stroke-width="1">
+        <path d="M240,230 H900"/>
+      </g>
+      <text class="sax" x="240" y="248">0 &middot; riskiest</text>
+      <text class="sax" x="570" y="248" text-anchor="middle">model score</text>
+      <text class="sax" x="900" y="248" text-anchor="end">100 &middot; safest</text>
+      <text class="anno" x="240" y="274">The third story has no decline band. When the loss is not ours to take, refusing the transaction is not on the menu, whatever the score says.</text>
+    </svg>
+  </div>
+
+  <div class="prose" style="margin-top:26px">
+    <p>Note that a leaf usually carries several cutoffs rather than one, because there are several actions to allocate between. The score bands map onto the action set inside the cell, and the boundaries come from the same arithmetic each time: hold the line where the marginal transaction stops paying. Approve while expected loss, times severity, times the share of exposure you are actually carrying, sits below what you charge net of cost to serve. Change the price, the covered share, or the recoverability and the boundary moves on its own. You are not tuning a number by feel, you are solving for it.</p>
+    <p>Two disciplines keep this from becoming a wall of knobs. First, every cutoff needs a story attached, in writing. A threshold nobody can explain is a knob somebody turned during an incident, and it will still be there in three years with a different meaning. Second, cutoffs face the same evidence constraint as splits: each one needs enough loss events on both sides to confirm it was in the right place. If a cell cannot support its own cutoff, it should inherit its parent's.</p>
+    <p>The payoff is in monitoring. When performance moves, a single global threshold tells you only that something changed. Story-level cutoffs tell you <em>which loss narrative</em> changed, which is usually the actual question, and it is the difference between reacting in a week and reacting in a quarter.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="n">07</span><h2>Tracing it end to end</h2></div>
+  <div class="prose">
+    <p>Set the levers and watch where a transaction lands. The panel on the right is what the leaf commits you to. The grid underneath shows the full partition for the vertical and method selected, which is the fastest way to see whether a lever belongs high in the tree: if changing it redraws the whole map, it belongs near the root.</p>
+  </div>
+
+  <div class="console">
+    <div class="console-bar"><span class="t">Decision trace</span><span class="s">illustrative model &middot; v0.4</span></div>
+    <div class="controls" id="controls"></div>
+    <div class="trace">
+      <div class="trace-nodes" id="nodes"></div>
+      <div class="leafpane" id="leaf"></div>
+    </div>
+  </div>
+  <div class="matrix-wrap">
+    <div class="matrix-cap">The full partition, for the vertical and method selected above</div>
+    <div class="matrix-sub">Every cell in the history by amount grid, colored by the action it earns.</div>
+    <table class="matrix" id="matrix"></table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="n">08</span><h2>How trees rot</h2></div>
+  <ol class="rot">
+    <li><span class="t">Leakage through the back door</span><span class="d">Splitting on something not actually available at decision time. Outcome data arrives days or weeks later, and any feature derived from it will look spectacular offline and do nothing in production. Every variable in the tree needs a timestamp check against the decision moment.</span></li>
+    <li><span class="t">No counterfactual on the refused volume</span><span class="d">You only observe outcomes on what you approved, so the tree gradually teaches itself that its own refusals were correct. Without a small random holdout that approves what the tree would have declined, there is no way to know whether a branch is protecting you or just hiding volume from you. The most expensive omission on this list and the easiest to fix.</span></li>
+    <li><span class="t">Correlated splits counted twice</span><span class="d">Several levers partly encode the same underlying thing. Stack them as though they were independent and the extreme cells become absurd, refusing volume that is perfectly fine. Interaction effects have to be fit on data rather than assumed away.</span></li>
+    <li><span class="t">Fossil branches</span><span class="d">A rule added during one incident for one counterparty, never retired, now shadowing a branch nobody can reach. Every leaf needs an owner, a written hypothesis and a review date, or the tree only ever grows.</span></li>
+    <li><span class="t">Cut points fixed in nominal terms</span><span class="d">Ticket sizes drift upward and boundaries do not. Two years later the top band holds a third of volume and the tree has quietly stopped segmenting. Review boundaries against the volume distribution on a schedule rather than when someone notices.</span></li>
+    <li><span class="t">Splitting past the evidence</span><span class="d">Cells that look clean because they hold eleven observations. The fix is a hard minimum enforced at build time, with anything below it merged into its parent automatically.</span></li>
+  </ol>
+</section>
+
+<section>
+  <div class="sec-head"><span class="n">09</span><h2>Shipping and keeping it</h2></div>
+  <dl class="gov">
+    <dt>Version the whole tree, not the individual rules</dt>
+    <dd>Every decision logs the tree version that produced it. Rule-level changelogs are unusable at review time, because you can never reconstruct what a given transaction actually saw.</dd>
+    <dt>Hold out a small random slice, permanently</dt>
+    <dd>Two to five percent receiving the champion treatment regardless of what any challenger says. This is what buys the counterfactual in failure mode 02, and it is cheap relative to what it tells you.</dd>
+    <dt>Challengers run at capped volume against a stated hypothesis</dt>
+    <dd>Not "let us try loosening this." Rather: this cell should clear standard treatment at under forty basis points, here is the volume needed to prove it, here is the date we decide either way.</dd>
+    <dt>Every leaf reports monthly</dt>
+    <dd>Volume, coverage, realized loss against expected, margin. A leaf that cannot produce those four numbers is not a leaf, it is a guess with a border around it.</dd>
+    <dt>Prune on the same cadence you grow</dt>
+    <dd>A standing rule that leaves below minimum volume merge upward automatically. Otherwise the tree only accumulates, and within a few years nobody is willing to touch it.</dd>
+  </dl>
+</section>
+
+<footer>
+  The short version: build the action set first, because segmentation needs something to segment toward. Split only where the action changes, only where you can name the mechanism, and only as deep as the evidence will support. Then let each leaf set its own cutoffs against the story of how loss happens there, rather than inheriting one line drawn across everything.
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var LEVERS = {
+    tenure:{lab:"History",hint:"Settled transactions observed to date",q:"How much repayment behavior have we observed?",why:"Steps down at settlement events, not calendar days.",
+      opts:[{id:"new",lab:"none settled",m:180},{id:"emg",lab:"1-3 settled",m:70},{id:"est",lab:"4+ settled",m:22}]},
+    amount:{lab:"Amount",hint:"Band, read as severity rather than frequency",q:"How much exposure does this create if it goes bad?",why:"Drives the exposure cap, not the decline line.",
+      opts:[{id:"a1",lab:"\u2264 $500",m:0.7,share:1},{id:"a2",lab:"$501 - 2,500",m:1.0,share:1},{id:"a3",lab:"$2,501 - 10,000",m:1.6,share:0.40},{id:"a4",lab:"> $10,000",m:2.6,share:0.10}]},
+    vertical:{lab:"Vertical",hint:"Reason mix and upstream control",q:"Who caused the loss, and could it have been prevented upstream?",why:"Gate: sets which actions are available at all.",
+      opts:[{id:"mkt",lab:"marketplace",m:0.75},{id:"ret",lab:"retail",m:1.0},{id:"hvg",lab:"high-value goods",m:1.4},{id:"hr",lab:"high-risk",m:2.0}]},
+    method:{lab:"Method",hint:"Information quality and reversal window",q:"How confident are we the instrument belongs to this person?",why:"The only lever we can buy more of.",
+      opts:[{id:"vfy",lab:"verified link",m:0.6,step:false},{id:"tok",lab:"returning token",m:0.85,step:true},{id:"man",lab:"manual entry",m:2.2,step:true}]}
+  };
+  var ACT = {
+    std:{nm:"Cover at standard price",c:"var(--a-std)",short:"Cover",price:85},
+    prem:{nm:"Cover at premium price",c:"var(--a-prem)",short:"Cover, premium",price:145},
+    cap:{nm:"Cover, capped exposure",c:"var(--a-cap)",short:"Capped cover",price:85},
+    step:{nm:"Verify, then re-decide",c:"var(--a-step)",short:"Verify",price:null},
+    open:{nm:"Proceed uncovered",c:"var(--a-open)",short:"Uncovered",price:null},
+    decline:{nm:"Decline or counter-offer",c:"var(--a-decline)",short:"Decline",price:null}
+  };
+  var OPEX = 12;
+  var state = {tenure:"emg",amount:"a2",vertical:"ret",method:"tok"};
+
+  function opt(k,id){var o=LEVERS[k].opts;for(var i=0;i<o.length;i++){if(o[i].id===id)return o[i];}return o[0];}
+  function expectedLoss(s){return opt("tenure",s.tenure).m*opt("amount",s.amount).m*opt("vertical",s.vertical).m*opt("method",s.method).m;}
+  function decide(s){
+    var el=expectedLoss(s), canStep=opt("method",s.method).step, key;
+    if(el<=45)key="std";
+    else if(el<=95)key="prem";
+    else if(el<=200)key="cap";
+    else if(el<=900)key=canStep?"step":"open";
+    else key="decline";
+    return {key:key,el:el};
+  }
+  function fmt(n,d){d=d===undefined?0:d;return n.toFixed(d).replace(/\B(?=(\d{3})+(?!\d))/g,",");}
+
+  function renderControls(){
+    var host=document.getElementById("controls"),html="",k;
+    for(k in LEVERS){var L=LEVERS[k];
+      html+='<div class="ctl"><div class="lab">'+L.lab+'</div><div class="hint">'+L.hint+'</div>';
+      for(var i=0;i<L.opts.length;i++){var o=L.opts[i];
+        html+='<button class="opt" data-k="'+k+'" data-id="'+o.id+'" aria-pressed="'+(state[k]===o.id)+'">'+o.lab+'</button>';}
+      html+='</div>';}
+    host.innerHTML=html;
+    host.addEventListener("click",function(e){var b=e.target.closest(".opt");if(!b)return;state[b.dataset.k]=b.dataset.id;render();});
+  }
+  function renderNodes(){
+    var order=["vertical","method","tenure","amount"],html="";
+    for(var i=0;i<order.length;i++){var k=order[i],L=LEVERS[k];
+      html+='<div class="node"><div class="q"><span class="ix">'+(i+1)+'</span><span>'+L.q+'</span></div><div class="branches">';
+      for(var j=0;j<L.opts.length;j++){var o=L.opts[j];
+        html+='<span class="br'+(state[k]===o.id?" on":"")+'">'+o.lab+'</span>';}
+      html+='</div><div class="why">'+L.why+'</div></div>';}
+    document.getElementById("nodes").innerHTML=html;
+  }
+  function row(k,v){return '<div class="econ-row"><span class="k">'+k+'</span><span>'+v+'</span></div>';}
+  function renderLeaf(){
+    var d=decide(state),a=ACT[d.key],el=d.el,amt=opt("amount",state.amount);
+    var share=(d.key==="cap")?amt.share:1, covered=el*share;
+    var html='<div class="leaf-action" style="color:'+a.c+'"><span class="pill" style="background:'+a.c+'"></span>'+a.nm+'</div>';
+    if(d.key==="cap")html+='<div class="leaf-sub">Cover the first tranche of exposure and leave the tail with the counterparty. The tail is the part this cell prices worst.</div>';
+    else if(d.key==="step")html+='<div class="leaf-sub">Too much uncertainty to price, but information is still purchasable. Verify, then run the trace again.</div>';
+    else if(d.key==="open")html+='<div class="leaf-sub">Nothing left to buy at this method and no price clears. Process it, state the terms, keep the volume.</div>';
+    else if(d.key==="decline")html+='<div class="leaf-sub">Nothing on the action set clears. Check whether an amount-limited counter-offer lands in a band that does.</div>';
+    else html+='<div class="leaf-sub">Estimate is tight enough to price and the margin clears. Volume belongs here by default.</div>';
+    html+='<div class="econ">'+row("expected loss",fmt(el,0)+" bps");
+    if(a.price!==null){
+      html+=row("covered share",(share*100).toFixed(0)+"%")+row("covered loss",fmt(covered,0)+" bps")+row("price",fmt(a.price,0)+" bps")+row("cost to serve",OPEX+" bps");
+      var margin=a.price-covered-OPEX;
+      html+='<div class="econ-row total"><span class="k">margin</span><span style="color:'+(margin>0?"var(--a-std)":"var(--a-decline)")+'">'+(margin>0?"+":"")+fmt(margin,0)+' bps</span></div>';
+    } else {
+      html+=row("covered share","0%")+row("price","\u2014")+'<div class="econ-row total"><span class="k">margin</span><span>no coverage revenue</span></div>';
+    }
+    document.getElementById("leaf").innerHTML=html+'</div>';
+  }
+  function renderMatrix(){
+    var T=LEVERS.tenure.opts,A=LEVERS.amount.opts,html='<tr><th></th>';
+    for(var i=0;i<T.length;i++)html+='<th>'+T[i].lab+'</th>';
+    html+='</tr>';
+    for(var r=0;r<A.length;r++){
+      html+='<tr><th class="rowh">'+A[r].lab+'</th>';
+      for(var c=0;c<T.length;c++){
+        var s={tenure:T[c].id,amount:A[r].id,vertical:state.vertical,method:state.method};
+        var d=decide(s),a=ACT[d.key];
+        var here=(state.tenure===T[c].id&&state.amount===A[r].id)?" here":"";
+        html+='<td><div class="cell'+here+'" style="background:'+a.c+'"><span class="act">'+a.short+'</span><span class="el">'+fmt(d.el,0)+' bps</span></div></td>';}
+      html+='</tr>';}
+    document.getElementById("matrix").innerHTML=html;
+  }
+  function render(){
+    var o=document.getElementById("controls").querySelectorAll(".opt");
+    for(var i=0;i<o.length;i++)o[i].setAttribute("aria-pressed",state[o[i].dataset.k]===o[i].dataset.id);
+    renderNodes();renderLeaf();renderMatrix();
+  }
+  renderControls();render();
+
+  var vol=document.getElementById("vol"),rate=document.getElementById("rate"),disp=document.getElementById("disp");
+  var DISP=[{lab:"tight, x1.5 evidence needed",f:1.5},{lab:"moderate, x2.5 evidence needed",f:2.5},{lab:"wide, x4 evidence needed",f:4}];
+  function cr(k,v){return '<div><span class="k">'+k+'</span><span>'+v+'</span></div>';}
+  function calc(){
+    var v=+vol.value,r=+rate.value/10000,dd=DISP[+disp.value-1];
+    document.getElementById("volv").textContent=fmt(v,0);
+    document.getElementById("ratev").textContent=(r*10000)+" bps, about 1 in "+fmt(Math.round(1/r),0);
+    document.getElementById("dispv").textContent=dd.lab;
+    var needed=Math.round(96*dd.f), perMonth=v*r, months=perMonth>0?needed/perMonth:Infinity;
+    document.getElementById("readout").innerHTML=
+      cr("loss events per month",perMonth<10?perMonth.toFixed(1):fmt(Math.round(perMonth),0))+
+      cr("events needed",fmt(needed,0))+
+      cr("months to read the cell",months>240?"never, in practice":months.toFixed(1));
+    var el=document.getElementById("verdict"),hd,bd,col;
+    if(months<=1.5){col="var(--a-std)";hd="Room to split further";
+      bd="This cell generates evidence fast enough to support finer segmentation, so leaving it whole gives up pricing precision you could have.";}
+    else if(months<=4){col="var(--a-prem)";hd="Right-sized";
+      bd="Readable within a quarter, which matches the cadence you would want for retuning. Hold it here.";}
+    else if(months<=12){col="var(--a-cap)";hd="Thin, watch it";
+      bd="Readable within a year, meaning a full cycle passes before you know whether you were right. Acceptable only if the cell matters enough to wait for.";}
+    else{col="var(--a-decline)";hd="Merge it upward";
+      bd="You will never accumulate enough evidence to price this cell on its own, so any rate you compute for it is noise. Fold it into the parent and let the model handle the variation inside.";}
+    el.style.borderLeftColor=col;
+    el.querySelector(".hd").textContent=hd;el.querySelector(".hd").style.color=col;
+    el.querySelector(".bd").textContent=bd;
+  }
+  vol.addEventListener("input",calc);rate.addEventListener("input",calc);disp.addEventListener("input",calc);calc();
+})();
+</script>
+</body>
+</html>
